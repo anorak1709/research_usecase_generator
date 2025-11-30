@@ -27,7 +27,7 @@ const Header = () => (
   }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
       <div style={{ width: '12px', height: '12px', background: 'white', borderRadius: '50%' }}></div>
-      <span style={{ fontWeight: 600, letterSpacing: '-0.02em', fontSize: '1.1rem' }}>CrewAI Analyst</span>
+      <span style={{ fontWeight: 600, letterSpacing: '-0.02em', fontSize: '1.1rem' }}>Business Use-Case Generator</span>
     </div>
     <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Research → Strategy</div>
   </header>
@@ -46,11 +46,13 @@ const Button = ({ onClick, children, primary = false, disabled = false }) => (
       cursor: disabled ? 'not-allowed' : 'pointer',
       fontSize: '0.95rem',
       fontWeight: 600,
-      opacity: disabled ? 0.5 : 1,
+      opacity: disabled ? 0.7 : 1,
       transition: 'all 0.2s',
       display: 'inline-flex',
       alignItems: 'center',
-      gap: '0.5rem'
+      gap: '0.5rem',
+      minWidth: primary ? '180px' : 'auto',
+      justifyContent: 'center'
     }}
     onMouseEnter={(e) => { if(!disabled) e.currentTarget.style.transform = 'translateY(-1px)'; }}
     onMouseLeave={(e) => { if(!disabled) e.currentTarget.style.transform = 'translateY(0)'; }}
@@ -72,6 +74,52 @@ const ProgressBar = ({ progress, label }) => (
         background: 'white', 
         transition: 'width 0.4s ease' 
       }}></div>
+    </div>
+  </div>
+);
+
+const ExecutiveSummary = ({ text }) => (
+  <div className="fade-in fade-in-delay-1" style={{
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
+    border: '1px solid var(--border)',
+    borderRadius: '12px',
+    padding: '2rem',
+    marginBottom: '2rem',
+    position: 'relative',
+    overflow: 'hidden'
+  }}>
+    <div style={{ 
+      position: 'absolute', 
+      top: 0, 
+      left: 0, 
+      width: '4px', 
+      height: '100%', 
+      background: 'var(--text-primary)' 
+    }} />
+    <h3 style={{ 
+      fontSize: '0.8rem', 
+      textTransform: 'uppercase', 
+      letterSpacing: '0.05em', 
+      color: 'var(--text-secondary)', 
+      marginBottom: '1rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem'
+    }}>
+      <span style={{ width: '6px', height: '6px', background: 'var(--success)', borderRadius: '50%' }}></span>
+      Executive Summary
+    </h3>
+    <div style={{ 
+      fontSize: '1.15rem', 
+      lineHeight: '1.6', 
+      color: '#e0e0e0',
+      fontWeight: 400
+    }}>
+      {text.split('\n').map((line, i) => (
+        <p key={i} style={{ marginBottom: line.trim() ? '0.5rem' : 0 }}>
+            {line.replace(/^> /, '')}
+        </p>
+      ))}
     </div>
   </div>
 );
@@ -269,6 +317,7 @@ const App = () => {
   const [currentAgent, setCurrentAgent] = useState("");
   const [logs, setLogs] = useState([]);
   const [resultText, setResultText] = useState("");
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -322,7 +371,13 @@ fn init_consensus(peers: Vec<String>) -> Result<Consensus, Error> {
   };
 
   const startAnalysis = async () => {
+  setIsInitializing(true);
+
+  // Artificial delay to show loading state (UX improvement)
+  await new Promise(resolve => setTimeout(resolve, 800));
+
   setView('processing');
+  setIsInitializing(false);
   
   const formData = new FormData();
   formData.append('file', file);
@@ -497,8 +552,15 @@ fn init_consensus(peers: Vec<String>) -> Result<Consensus, Error> {
           </div>
           
           <div style={{ textAlign: 'center' }}>
-            <Button primary onClick={startAnalysis}>
-              Initialize Agents
+            <Button primary onClick={startAnalysis} disabled={isInitializing}>
+              {isInitializing ? (
+                <>
+                  <span className="spinner"></span>
+                  Starting...
+                </>
+              ) : (
+                "🚀 Generate Analysis & Use-Cases"
+              )}
             </Button>
           </div>
         </div>
@@ -506,60 +568,79 @@ fn init_consensus(peers: Vec<String>) -> Result<Consensus, Error> {
     </div>
   );
 
-  const ResultView = () => (
-    <div className="fade-in" style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 2rem' }}>
-      
-      {/* Animated Success Message */}
-      <div className="slide-down" style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-        padding: '1rem 1.5rem',
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: '1px solid rgba(50, 215, 75, 0.3)',
-        borderRadius: '12px',
-        marginBottom: '3rem',
-        backdropFilter: 'blur(10px)'
-      }}>
-        <div style={{ 
-           display: 'flex', 
-           alignItems: 'center', 
-           justifyContent: 'center',
-           background: 'rgba(50, 215, 75, 0.1)', 
-           borderRadius: '50%', 
-           width: '32px',
-           height: '32px'
+  const ResultView = () => {
+    // Helper to extract summary logic
+    const extractSummary = (content) => {
+      // Logic: Extract content between "1. Research Summary" and the next header "###"
+      const match = content.match(/### 1\. Research Summary\s*([\s\S]*?)(?=###|$)/);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+      // Fallback: Return the first substantial paragraph
+      const paragraphs = content.split('\n').filter(p => p.length > 50 && !p.startsWith('#'));
+      return paragraphs[0] || "Summary not available.";
+    };
+
+    const summaryText = extractSummary(resultText);
+
+    return (
+      <div className="fade-in" style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 2rem' }}>
+        
+        {/* Animated Success Message */}
+        <div className="slide-down" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '1rem 1.5rem',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(50, 215, 75, 0.3)',
+          borderRadius: '12px',
+          marginBottom: '3rem',
+          backdropFilter: 'blur(10px)'
         }}>
-           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#32d74b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <div style={{ 
+             display: 'flex', 
+             alignItems: 'center', 
+             justifyContent: 'center',
+             background: 'rgba(50, 215, 75, 0.1)', 
+             borderRadius: '50%', 
+             width: '32px',
+             height: '32px'
+          }}>
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#32d74b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'white', marginBottom: '0.1rem' }}>Success</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>The analysis has been successfully generated.</p>
+          </div>
         </div>
-        <div>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'white', marginBottom: '0.1rem' }}>Success</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>The analysis has been successfully generated.</p>
-        </div>
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Analysis Report</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Generated by CrewAI • {new Date().toLocaleDateString()}</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Analysis Report</h1>
+            <p style={{ color: 'var(--text-secondary)' }}>Generated by CrewAI • {new Date().toLocaleDateString()}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+             <Button onClick={() => window.location.reload()}>Analyze New Paper</Button>
+             <Button primary onClick={() => alert("Downloading markdown...")}>Download Report</Button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-           <Button onClick={() => window.location.reload()}>Analyze New Paper</Button>
-           <Button primary onClick={() => alert("Downloading markdown...")}>Download Report</Button>
-        </div>
-      </div>
 
-      <div style={{ 
-        background: 'var(--card-bg)', 
-        border: '1px solid var(--border)', 
-        borderRadius: '16px', 
-        padding: '3rem',
-        minHeight: '600px'
-      }}>
-        <MarkdownRenderer content={resultText} />
+        {/* New Executive Summary Section */}
+        <ExecutiveSummary text={summaryText} />
+
+        <div style={{ 
+          background: 'var(--card-bg)', 
+          border: '1px solid var(--border)', 
+          borderRadius: '16px', 
+          padding: '3rem',
+          minHeight: '600px'
+        }}>
+          <MarkdownRenderer content={resultText} />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
